@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Розширена Paint Дошка</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Arial&family=Harlow+Solid+Italic&family=Times+New+Roman&display=swap');
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f0f0f0;
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    #controls {
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    canvas {
+      border: 2px solid #333;
+      background: white;
+      cursor: crosshair;
+    }
+    input, button, select {
+      margin: 5px;
+    }
+    footer {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #555;
+    }
+    #docContent {
+      width: 800px;
+      height: 300px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background: #fff;
+      margin-top: 20px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 Розширена Paint Дошка</h1>
+  <div id="controls">
+    <label>Колір: <input type="color" id="colorPicker" value="#000000" /></label>
+    <label>Товщина: <input type="range" id="lineWidth" min="1" max="30" value="5" /></label>
+    <label>Шрифт:
+      <select id="fontSelect">
+        <option value="Arial">Arial</option>
+        <option value="\"Harlow Solid Italic\", cursive">H652 Solid Italic</option>
+        <option value="Aptos">Aptos</option>
+        <option value="\"Times New Roman\", serif">Times New Roman</option>
+      </select>
+    </label>
+    <label>Розмір:
+      <input type="number" id="fontSize" value="20" min="8" max="100" style="width: 60px;" />
+    </label>
+    <button id="textBtn">✏️ Текст</button>
+    <button id="cutBtn">✂️ Вирізати</button>
+    <input type="file" id="imageLoader" accept="image/*">
+    <button id="clearBtn">🧹 Очистити</button>
+    <button id="newSheetBtn">📄 Новий аркуш</button>
+    <button id="savePNG">💾 PNG</button>
+    <button id="saveJPG">💾 JPEG</button>
+    <button id="savePDF">📄 PDF</button>
+    <button id="generateDocx">📝 DOCX</button>
+    <button id="saveWord">💾 Зберегти Word</button>
+  </div>
+
+  <canvas id="paintCanvas" width="800" height="500"></canvas>
+
+  <div>
+    <h3>📝 Текстовий документ (Word):</h3>
+    <div id="docContent" contenteditable="true">Напишіть сюди текст документа...</div>
+  </div>
+
+  <footer>
+    &copy; 2017–2025 MaxNT Official, All rights reserved.
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.7.0/docx.min.js"></script>
+  <script>
+    const canvas = document.getElementById('paintCanvas');
+    const ctx = canvas.getContext('2d');
+    const colorPicker = document.getElementById('colorPicker');
+    const lineWidth = document.getElementById('lineWidth');
+    const clearBtn = document.getElementById('clearBtn');
+    const newSheetBtn = document.getElementById('newSheetBtn');
+    const savePNG = document.getElementById('savePNG');
+    const saveJPG = document.getElementById('saveJPG');
+    const savePDF = document.getElementById('savePDF');
+    const textBtn = document.getElementById('textBtn');
+    const cutBtn = document.getElementById('cutBtn');
+    const imageLoader = document.getElementById('imageLoader');
+    const fontSelect = document.getElementById('fontSelect');
+    const fontSize = document.getElementById('fontSize');
+    const generateDocx = document.getElementById('generateDocx');
+    const saveWord = document.getElementById('saveWord');
+    const docContent = document.getElementById('docContent');
+
+    let isDrawing = false;
+    let isTextMode = false;
+    let isCutMode = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (isTextMode) {
+        const text = prompt("Введіть текст:");
+        if (text) {
+          ctx.fillStyle = colorPicker.value;
+          const font = `${fontSize.value}px ${fontSelect.value}`;
+          ctx.font = font;
+          ctx.fillText(text, e.offsetX, e.offsetY);
+        }
+        isTextMode = false;
+        return;
+      }
+
+      if (isCutMode) {
+        const width = parseInt(prompt("Ширина фрагмента:"));
+        const height = parseInt(prompt("Висота фрагмента:"));
+        if (!isNaN(width) && !isNaN(height)) {
+          ctx.clearRect(e.offsetX, e.offsetY, width, height);
+        }
+        isCutMode = false;
+        return;
+      }
+
+      isDrawing = true;
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    });
+
+    canvas.addEventListener('mouseup', () => isDrawing = false);
+    canvas.addEventListener('mouseout', () => isDrawing = false);
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDrawing) return;
+      ctx.strokeStyle = colorPicker.value;
+      ctx.lineWidth = lineWidth.value;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    });
+
+    clearBtn.addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
+
+    newSheetBtn.addEventListener('click', () => {
+      if (confirm("Створити новий аркуш? Поточний буде очищено.")) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    });
+
+    savePNG.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'malunok.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    saveJPG.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'malunok.jpg';
+      link.href = canvas.toDataURL('image/jpeg', 1.0);
+      link.click();
+    });
+
+    savePDF.addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 10, 10, 190, 120);
+      pdf.save('malunok.pdf');
+    });
+
+    textBtn.addEventListener('click', () => isTextMode = true);
+    cutBtn.addEventListener('click', () => isCutMode = true);
+
+    imageLoader.addEventListener('change', function(e) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          ctx.drawImage(img, 50, 50);
+        }
+        img.src = event.target.result;
+      }
+      reader.readAsDataURL(e.target.files[0]);
+    });
+
+    generateDocx.addEventListener('click', () => {
+      const text = docContent.innerText;
+      const doc = new docx.Document({
+        sections: [
+          {
+            children: [
+              new docx.Paragraph({
+                children: [new docx.TextRun(text)]
+              })
+            ]
+          }
+        ]
+      });
+
+      docx.Packer.toBlob(doc).then(blob => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'document.docx';
+        link.click();
+      });
+    });
+
+    saveWord.addEventListener('click', () => {
+      const text = docContent.innerText;
+      const doc = new docx.Document({
+        sections: [
+          {
+            children: [
+              new docx.Paragraph({
+                children: [new docx.TextRun(text)]
+              }),
+              new docx.Paragraph({
+                children: [new docx.TextRun("Малюнок:").bold()]
+              })
+            ]
+          }
+        ]
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      doc.addImage(imgData, 'PNG', 10, 10, 200, 100);
+
+      docx.Packer.toBlob(doc).then(blob => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'document_with_image.docx';
+        link.click();
+      });
+    });
+  </script>
+</body>
+</html>
